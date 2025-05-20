@@ -1,11 +1,12 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strings"
+
+	"encoding/json"
 
 	"github.com/gocolly/colly"
 )
@@ -35,10 +36,12 @@ func main() {
 	for _, url := range urls {
 		entry, err := urlToWikiEntry(c, url)
 		if err != nil {
-			// error handling here
+			fmt.Println("URL not found", url)
 		}
-		// temp print to console to use entry
-		fmt.Println(entry)
+		err = write(entry, file)
+		if err != nil {
+			fmt.Println("Problem converting to JSON and/or writing to file")
+		}
 	}
 
 	// temp print to use c
@@ -46,30 +49,34 @@ func main() {
 }
 
 type wikiEntry struct {
-	url   string
-	title string
-	links []string
-	body  string
+	URL   string   `json:"url"`
+	Title string   `json:"title"`
+	Links []string `json:"links"`
+	Body  string   `json:"body"`
+}
+
+func write(w wikiEntry, f *os.File) error {
+	b, err := json.Marshal(w)
+	if err != nil {
+		fmt.Println("Error writing JSON to file")
+		return err
+	}
+	fmt.Fprintln(f, b)
+	return nil
 }
 
 func urlToWikiEntry(c *colly.Collector, url string) (wikiEntry, error) {
 	var entry wikiEntry
-	entry.url = url
+	entry.URL = url
 	// Wikipedia urls of the form https://en.wikipedia.org/wiki/Title:
-	entry.title = strings.Split(url, "/")[4]
+	entry.Title = strings.Split(url, "/")[4]
 	c.OnHTML("div.mw-body-content", func(e *colly.HTMLElement) {
-		entry.body = e.Text
+		entry.Body = e.Text
 		e.ForEach("a[href]", func(_ int, link *colly.HTMLElement) {
-			entry.links = append(entry.links, link.Attr("href"))
+			entry.Links = append(entry.Links, link.Attr("href"))
 		})
 
 	})
 	err := c.Visit(url)
 	return entry, err
-}
-
-func wikiEntryToJsonl(e wikiEntry) (string, error) {
-	// temp return
-	fmt.Println(e)
-	return "tacos", errors.New("temp error")
 }
