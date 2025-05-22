@@ -8,6 +8,8 @@ import (
 
 	"encoding/json"
 
+	"slices"
+
 	"github.com/gocolly/colly"
 )
 
@@ -43,9 +45,6 @@ func main() {
 			fmt.Println("Problem converting to JSON and/or writing to file")
 		}
 	}
-
-	// temp print to use c
-	fmt.Println(c)
 }
 
 type wikiEntry struct {
@@ -58,25 +57,37 @@ type wikiEntry struct {
 func write(w wikiEntry, f *os.File) error {
 	b, err := json.Marshal(w)
 	if err != nil {
-		fmt.Println("Error writing JSON to file")
+		fmt.Println("Error encoding JSON")
 		return err
 	}
-	fmt.Fprintln(f, b)
+	fmt.Fprintln(f, string(b))
 	return nil
 }
 
 func urlToWikiEntry(c *colly.Collector, url string) (wikiEntry, error) {
+	skipTags := []string{
+		"style",
+		"noscript",
+		"meta",
+		"bdi",
+	}
 	var entry wikiEntry
 	entry.URL = url
 	// Wikipedia urls of the form https://en.wikipedia.org/wiki/Title:
 	entry.Title = strings.Split(url, "/")[4]
 	c.OnHTML("div.mw-body-content", func(e *colly.HTMLElement) {
-		entry.Body = e.Text
+		e.ForEach("*", func(_ int, child *colly.HTMLElement) {
+			// omit skipped tags
+			if !slices.Contains(skipTags, child.Name) {
+				entry.Body = entry.Body + "\n\n" + child.Text
+			}
+		})
 		e.ForEach("a[href]", func(_ int, link *colly.HTMLElement) {
 			entry.Links = append(entry.Links, link.Attr("href"))
 		})
 
 	})
 	err := c.Visit(url)
+	fmt.Println(entry.Body[:500])
 	return entry, err
 }
