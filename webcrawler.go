@@ -8,8 +8,6 @@ import (
 
 	"encoding/json"
 
-	"slices"
-
 	"github.com/gocolly/colly"
 )
 
@@ -65,12 +63,12 @@ func write(w wikiEntry, f *os.File) error {
 }
 
 func urlToWikiEntry(c *colly.Collector, url string) (wikiEntry, error) {
-	skipTags := []string{
-		"style",
-		"noscript",
-		"meta",
-		"bdi",
-	}
+	// skipTags := []string{
+	// 	"style",
+	// 	"noscript",
+	// 	"meta",
+	// 	"bdi",
+	// }
 	var entry wikiEntry
 	entry.URL = url
 	// Wikipedia urls of the form https://en.wikipedia.org/wiki/Title:
@@ -78,9 +76,13 @@ func urlToWikiEntry(c *colly.Collector, url string) (wikiEntry, error) {
 	c.OnHTML("div.mw-body-content", func(e *colly.HTMLElement) {
 		e.ForEach("*", func(_ int, child *colly.HTMLElement) {
 			// omit skipped tags
-			if !slices.Contains(skipTags, child.Name) {
+			switch child.Name {
+			case "style":
+				return
+			default:
 				entry.Body = entry.Body + "\n\n" + child.Text
 			}
+
 		})
 		e.ForEach("a[href]", func(_ int, link *colly.HTMLElement) {
 			entry.Links = append(entry.Links, link.Attr("href"))
